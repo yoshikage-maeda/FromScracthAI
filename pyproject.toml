@@ -6,7 +6,8 @@ authors = [
     { name = "jamuojisan", email = "kage0427@gmail.com" }
 ]
 dependencies = [
-    "numpy>=2.2.0",
+    "numpy>=2.2.1",
+    "pytest>=8.3.4",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
