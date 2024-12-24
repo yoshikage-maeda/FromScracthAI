@@ -55,9 +55,9 @@ class Variable:
         self.creator = func
         self.generation = func.generation + 1
     
-    def backward(self, retain_grad=False):
+    def backward(self, retain_grad=False, create_graph=False):
         if self.grad is None:
-            self.grad = np.ones_like(self.data)
+            self.grad = Variable(np.ones_like(self.data))
         funcs = []
         seen_set = set()
         def add_func(f):
@@ -68,20 +68,21 @@ class Variable:
         while funcs:
             f_info = heapq.heappop(funcs)
             f = f_info.data  # 関数の情報を取得
-            
             gys = [output().grad for output in f.outputs] #[output().grad for output in f.outputs]
-            gxs = f.backward(*gys)
-            if not isinstance(gxs, tuple):
-                gxs = (gxs,)  # 1要素のタプルに変換する。
-            
-            for x, gx in zip(f.inputs, gxs):
-                if x.grad is None:
-                    x.grad = gx
-                else:
-                    x.grad = x.grad + gx
 
-                if x.creator is not None:
-                    add_func(x.creator)
+            with using_config('enable_backprop', create_graph):
+                gxs = f.backward(*gys)
+                if not isinstance(gxs, tuple):
+                    gxs = (gxs,)  # 1要素のタプルに変換する。
+                
+                for x, gx in zip(f.inputs, gxs):
+                    if x.grad is None:
+                        x.grad = gx
+                    else:
+                        x.grad = x.grad + gx
+
+                    if x.creator is not None:
+                        add_func(x.creator)
             if not retain_grad:
                 for y in f.outputs:
                     y().grad = None # yはweakref
@@ -132,7 +133,7 @@ class Mul(Function):
         return y
     
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         return gy * x1, gy * x0
 
 def mul(x0, x1):
@@ -171,7 +172,7 @@ class Div(Function):
         return y
     
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         return gy / x1, -gy * (x0 / x1 ** 2)
 
 class Pow(Function):
@@ -183,7 +184,7 @@ class Pow(Function):
         return y
     
     def backward(self, gy):
-        x = self.inputs[0].data
+        x,  = self.inputs
         c = self.c
         gy = gy * c * (x ** (c - 1))
         return gy
